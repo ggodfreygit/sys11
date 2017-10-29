@@ -543,6 +543,15 @@ cmd_mainmenu(int n, char **a)
 	showmenu("OS/161 kernel menu", mainmenu);
 	return 0;
 }
+static
+int
+cmd_nickgay(int n, char **a)
+{
+	(void)n;
+	(void)a;
+	kprintf("Wow, nick is such a gayzo\n");
+	return 0;
+}
 
 ////////////////////////////////////////
 //
@@ -558,6 +567,7 @@ static struct {
 	{ "help",	cmd_mainmenu },
 	{ "?o",		cmd_opsmenu },
 	{ "?t",		cmd_testmenu },
+	{ "nick",	cmd_nickgay },
 
 	/* operations */
 	{ "s",		cmd_shell },

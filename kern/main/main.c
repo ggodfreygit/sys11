@@ -71,7 +71,7 @@ extern const char buildconfig[];
  */
 static const char harvard_copyright[] =
     "Copyright (c) 2000, 2001-2005, 2008-2011, 2013, 2014\n"
-    "   President and Fellows of Harvard College.  All rights reserved.\n";
+    "   President and Fellows of Devry University.  All rights reserved.\n";
 
 
 /*
@@ -103,7 +103,7 @@ boot(void)
 	kprintf("%s", harvard_copyright);
 	kprintf("\n");
 
-	kprintf("Put-your-group-name-here's system version %s (%s #%d)\n",
+	kprintf("Crazy Dolphin Man's system version %s (%s #%d)\n",
 		GROUP_VERSION, buildconfig, buildversion);
 	kprintf("\n");
 
