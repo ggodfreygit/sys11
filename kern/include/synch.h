@@ -74,6 +74,10 @@ void V(struct semaphore *);
  */
 struct lock {
         char *lk_name;
+	volatile bool free;	//easily able to tell if lock is free
+	struct wchan *lock_wchan;	//lock wchan and spinlock. Usage adapted from semaphore
+	struct spinlock lock_lock;	
+	volatile struct thread *curr_user; //the thread currently using the lock
         // add what you need here
         // (don't forget to mark things volatile as needed)
 };
@@ -113,6 +117,8 @@ bool lock_do_i_hold(struct lock *);
 
 struct cv {
         char *cv_name;
+	struct wchan *control_wchan;
+	struct spinlock control_spinlock;
         // add what you need here
         // (don't forget to mark things volatile as needed)
 };

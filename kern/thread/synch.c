@@ -155,6 +155,19 @@ lock_create(const char *name)
         }
 
         // add stuff here as needed
+	lock->lock_wchan = wchan_create(lock->lk_name);	//wchan for lock implementation, taken from semaphore implementation and adapted
+	
+	if (lock->lock_wchan == NULL) {
+		kfree(lock->lock_wchan);
+		kfree(lock);
+		return NULL;
+	}
+
+	spinlock_init(&lock->lock_lock);
+
+	lock->free = true;		//locks start out free
+
+	lock->curr_user = NULL;		//locks have no initial user
 
         return lock;
 }
@@ -165,9 +178,18 @@ lock_destroy(struct lock *lock)
         KASSERT(lock != NULL);
 
         // add stuff here as needed
+	
+	KASSERT(lock->free == true);	//ensure no one is using the lock
+	KASSERT(lock->curr_user == NULL);
+	spinlock_cleanup(&lock->lock_lock);
+	
+	wchan_destroy(lock->lock_wchan);
 
         kfree(lock->lk_name);
+	
         kfree(lock);
+//mostly adapted from semaphore
+
 }
 
 void
@@ -175,7 +197,22 @@ lock_acquire(struct lock *lock)
 {
         // Write this
 
-        (void)lock;  // suppress warning until code gets written
+	KASSERT(lock != NULL);		//ensure valid lock is passed
+	KASSERT(curthread->t_in_interrupt == false);
+	
+	spinlock_acquire(&lock->lock_lock);	//aquire spinlock
+		
+	while(lock->free == false)	//while lock is held
+	{
+		
+		wchan_sleep(lock->lock_wchan, &lock->lock_lock);
+	}
+	//lock should be free at this point
+	
+	lock->curr_user = curthread;	//current user is this thread!
+	lock->free = false;		//lock is no longer free!
+	spinlock_release(&lock->lock_lock);
+         //(void)lock;	// suppress warning until code gets written
 }
 
 void
@@ -183,17 +220,31 @@ lock_release(struct lock *lock)
 {
         // Write this
 
-        (void)lock;  // suppress warning until code gets written
+	KASSERT(lock != NULL); //ensure valid lock
+	KASSERT(lock_do_i_hold(lock)); //ensure this thread holds the lock!
+	spinlock_acquire(&lock->lock_lock);	//re-acquire spinlock
+	lock->curr_user = NULL; //Dobby has no Master
+	lock->free = true; //Dobby is FREE!
+	wchan_wakeone(lock->lock_wchan, &lock->lock_lock);
+	spinlock_release(&lock->lock_lock);
+        //(void)lock;  // suppress warning until code gets written
 }
 
 bool
 lock_do_i_hold(struct lock *lock)
 {
+	KASSERT(lock != NULL);
         // Write this
+	if(lock->free == true)
+		return false;
+	else if(lock->curr_user == curthread)
+		return true;
+	else
+		return false;
 
-        (void)lock;  // suppress warning until code gets written
+        //(void)lock;  // suppress warning until code gets written
 
-        return true; // dummy until code gets written
+        //return true; // dummy until code gets written
 }
 
 ////////////////////////////////////////////////////////////
@@ -216,9 +267,16 @@ cv_create(const char *name)
                 kfree(cv);
                 return NULL;
         }
+	cv->control_wchan=wchan_create(cv->cv_name);	//adapted from semaphores and locks
+	
+	if(cv->control_wchan==NULL){
+		kfree(cv->cv_name);
+		kfree(cv);
+		return NULL;
+	}
 
         // add stuff here as needed
-
+	spinlock_init(&cv->control_spinlock);		//CV needs a spinlock as well
         return cv;
 }
 
@@ -228,6 +286,9 @@ cv_destroy(struct cv *cv)
         KASSERT(cv != NULL);
 
         // add stuff here as needed
+	wchan_destroy(cv->control_wchan);		//cleanup our only two variables
+	spinlock_cleanup(&cv->control_spinlock);
+
 
         kfree(cv->cv_name);
         kfree(cv);
@@ -236,23 +297,58 @@ cv_destroy(struct cv *cv)
 void
 cv_wait(struct cv *cv, struct lock *lock)
 {
+	KASSERT(cv != NULL);
+	KASSERT(lock != NULL);
+	KASSERT(lock_do_i_hold(lock) == true); //ensure all variables and permissions are valid
+
+
+	//steps directly from slides!
+
+
+	spinlock_acquire(&cv->control_spinlock); //acquire spinlock for CV
+
+	lock_release(lock);	//release lock
+
+	wchan_sleep(cv->control_wchan, &cv->control_spinlock);		//put thread to sleep in CV wchan
+	spinlock_release(&cv->control_spinlock);	//releace spinlock for CV
+	lock_acquire(lock);	//acquire lock
         // Write this
-        (void)cv;    // suppress warning until code gets written
-        (void)lock;  // suppress warning until code gets written
+        //(void)cv;    // suppress warning until code gets written
+        //(void)lock;  // suppress warning until code gets written
 }
 
 void
 cv_signal(struct cv *cv, struct lock *lock)
 {
+	KASSERT(cv != NULL);
+	KASSERT(lock != NULL);
+	KASSERT(lock_do_i_hold(lock) == true); //ensure all variables and permissions are valid
+
+	spinlock_acquire(&cv->control_spinlock); //acquire spinlock for CV
+	
+	wchan_wakeone(cv->control_wchan, &cv->control_spinlock);	//wake thread in CV
+
+	spinlock_release(&cv->control_spinlock);		//release spinlock for CV
         // Write this
-	(void)cv;    // suppress warning until code gets written
-	(void)lock;  // suppress warning until code gets written
+	//(void)cv;    // suppress warning until code gets written
+	//(void)lock;  // suppress warning until code gets written
 }
 
 void
 cv_broadcast(struct cv *cv, struct lock *lock)
-{
+{	
+	KASSERT(cv != NULL);
+	KASSERT(lock != NULL);
+	KASSERT(lock_do_i_hold(lock) == true); //ensure all variables and permissions are valid
+
+	//essentially the same as signal, but for all threads
+
+	spinlock_acquire(&cv->control_spinlock); //acquire spinlock for CV
+	
+	wchan_wakeall(cv->control_wchan, &cv->control_spinlock);	//wake thread in CV
+
+	spinlock_release(&cv->control_spinlock);		//release spinlock for CV
 	// Write this
-	(void)cv;    // suppress warning until code gets written
-	(void)lock;  // suppress warning until code gets written
+	//(void)cv;    // suppress warning until code gets written
+	//(void)lock;  // suppress warning until code gets written
 }
