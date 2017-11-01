@@ -144,3 +144,20 @@ threadtest2(int nargs, char **args)
 
 	return 0;
 }
+int
+threadtest4(int nargs, char **args)
+{
+	(void)nargs;
+	(void)args;
+	//create thread
+	//have thread join with child?
+	//where does child come from?
+	//how do I signify its success??
+	kprintf("Test not yet implemented! :(\n");
+	//what do i even test here?
+	init_sem();
+	runthreads(0);	
+	kprintf("\nThread test 4 done.\n");
+
+	return 0;
+}

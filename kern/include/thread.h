@@ -109,6 +109,10 @@ struct thread {
 	bool t_did_reserve_buffers;	/* reserve_buffers() in effect */
 
 	/* add more here as needed */
+	bool complete;	//set when child is terminating, checked by parent
+	struct lock *t_lock;	//to protect
+	struct wchan *t_wchan;	//parent to sleep and wait
+	struct cv *t_cv;	//cv for parent to be waken up when child terminates
 };
 
 /*
@@ -146,7 +150,7 @@ void thread_shutdown(void);
 int thread_fork(const char *name, struct proc *proc,
                 void (*func)(void *, unsigned long),
                 void *data1, unsigned long data2);
-
+int thread_join(struct thread *child);
 /*
  * Cause the current thread to exit.
  * Interrupts need not be disabled.

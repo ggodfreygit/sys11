@@ -150,7 +150,10 @@ thread_create(const char *name)
 	thread->t_did_reserve_buffers = false;
 
 	/* If you add to struct thread, be sure to initialize here */
-
+	thread->t_wchan = wchan_create(thread->t_name);
+	thread->t_lock = lock_create(thread->t_name);
+	thread->complete = false;
+	thread->t_cv=cv_create(thread->t_name);
 	return thread;
 }
 
@@ -522,6 +525,11 @@ thread_fork(const char *name,
 
 	/* Thread subsystem fields */
 	newthread->t_cpu = curthread->t_cpu;
+	//here we set the parent fields!
+	newthread->complete = false;
+	newthread->t_wchan = wchan_create(newthread->t_name);
+	newthread->t_cv = cv_create(newthread->t_name);
+	newthread->t_lock = lock_create(newthread->t_name);
 
 	/* Attach the new thread to its process */
 	if (proc == NULL) {
@@ -549,7 +557,19 @@ thread_fork(const char *name,
 
 	return 0;
 }
-
+/*THREAD JOIN////////////////////////////////////////////////////////////////////////////*/
+int
+thread_join(struct thread *child)
+{
+	lock_acquire(child->t_lock);	//acquire spinlock
+	while(child->complete == false)
+	{
+		cv_wait(child->t_cv, child->t_lock);
+	}
+	lock_release(child->t_lock);
+	
+	return child->complete;
+}
 /*
  * High level, machine-independent context switch code.
  *
@@ -786,7 +806,12 @@ thread_exit(void)
 	cur = curthread;
 
 	KASSERT(cur->t_did_reserve_buffers == false);
-
+	//thread join child
+	lock_acquire(cur->t_lock);	//acquire the child lock
+	cur->complete = true;
+	cv_signal(cur->t_cv, cur->t_lock);
+	lock_release(cur->t_lock);
+	//end thread join child
 	/*
 	 * Detach from our process. You might need to move this action
 	 * around, depending on how your wait/exit works.
